@@ -1,0 +1,195 @@
+-- ===========================
+-- CREATE TABLES
+-- ===========================
+
+CREATE TABLE Customers (
+    CustomerID NUMBER PRIMARY KEY,
+    Name VARCHAR2(100),
+    DOB DATE,
+    Balance NUMBER,
+    LastModified DATE
+);
+
+CREATE TABLE Accounts (
+    AccountID NUMBER PRIMARY KEY,
+    CustomerID NUMBER,
+    AccountType VARCHAR2(20),
+    Balance NUMBER,
+    LastModified DATE,
+    FOREIGN KEY (CustomerID) REFERENCES Customers(CustomerID)
+);
+
+CREATE TABLE Transactions (
+    TransactionID NUMBER PRIMARY KEY,
+    AccountID NUMBER,
+    TransactionDate DATE,
+    Amount NUMBER,
+    TransactionType VARCHAR2(10),
+    FOREIGN KEY (AccountID) REFERENCES Accounts(AccountID)
+);
+
+CREATE TABLE Loans (
+    LoanID NUMBER PRIMARY KEY,
+    CustomerID NUMBER,
+    LoanAmount NUMBER,
+    InterestRate NUMBER,
+    StartDate DATE,
+    EndDate DATE,
+    FOREIGN KEY (CustomerID) REFERENCES Customers(CustomerID)
+);
+
+CREATE TABLE Employees (
+    EmployeeID NUMBER PRIMARY KEY,
+    Name VARCHAR2(100),
+    Position VARCHAR2(50),
+    Salary NUMBER,
+    Department VARCHAR2(50),
+    HireDate DATE
+);
+
+-- ===========================
+-- INSERT DATA
+-- ===========================
+
+INSERT INTO Customers
+VALUES (1,'John Doe',TO_DATE('1950-05-15','YYYY-MM-DD'),12000,SYSDATE);
+
+INSERT INTO Customers
+VALUES (2,'Jane Smith',TO_DATE('1990-07-20','YYYY-MM-DD'),15000,SYSDATE);
+
+INSERT INTO Accounts
+VALUES (1,1,'Savings',12000,SYSDATE);
+
+INSERT INTO Accounts
+VALUES (2,2,'Checking',15000,SYSDATE);
+
+INSERT INTO Transactions
+VALUES (1,1,SYSDATE,200,'Deposit');
+
+INSERT INTO Transactions
+VALUES (2,2,SYSDATE,300,'Withdrawal');
+
+-- Loan due within 30 days
+INSERT INTO Loans
+VALUES (1,1,5000,5,SYSDATE,SYSDATE+10);
+
+INSERT INTO Employees
+VALUES (1,'Alice Johnson','Manager',70000,'HR',
+TO_DATE('2015-06-15','YYYY-MM-DD'));
+
+INSERT INTO Employees
+VALUES (2,'Bob Brown','Developer',60000,'IT',
+TO_DATE('2017-03-20','YYYY-MM-DD'));
+
+COMMIT;
+
+-- ===========================
+-- ADD VIP COLUMN
+-- ===========================
+
+ALTER TABLE Customers
+ADD IsVIP VARCHAR2(5);
+
+-- ===========================
+-- SCENARIO 1
+-- ===========================
+
+SET SERVEROUTPUT ON;
+
+DECLARE
+    CURSOR cust_cur IS
+        SELECT CustomerID,DOB FROM Customers;
+
+    v_age NUMBER;
+BEGIN
+    FOR cust IN cust_cur LOOP
+
+        v_age := FLOOR(MONTHS_BETWEEN(SYSDATE,cust.DOB)/12);
+
+        IF v_age > 60 THEN
+
+            UPDATE Loans
+            SET InterestRate = InterestRate - 1
+            WHERE CustomerID = cust.CustomerID;
+
+            DBMS_OUTPUT.PUT_LINE(
+            'Discount applied to Customer ID '
+            || cust.CustomerID);
+
+        END IF;
+
+    END LOOP;
+
+    COMMIT;
+END;
+/
+
+-- ===========================
+-- SCENARIO 2
+-- ===========================
+
+DECLARE
+    CURSOR cust_cur IS
+        SELECT CustomerID,Balance
+        FROM Customers;
+BEGIN
+
+    FOR cust IN cust_cur LOOP
+
+        IF cust.Balance > 10000 THEN
+
+            UPDATE Customers
+            SET IsVIP='TRUE'
+            WHERE CustomerID=cust.CustomerID;
+
+            DBMS_OUTPUT.PUT_LINE(
+            'Customer '
+            || cust.CustomerID
+            || ' promoted to VIP.');
+
+        ELSE
+
+            UPDATE Customers
+            SET IsVIP='FALSE'
+            WHERE CustomerID=cust.CustomerID;
+
+        END IF;
+
+    END LOOP;
+
+    COMMIT;
+
+END;
+/
+
+-- ===========================
+-- SCENARIO 3
+-- ===========================
+
+DECLARE
+
+    CURSOR loan_cur IS
+        SELECT l.LoanID,
+               c.Name,
+               l.EndDate
+        FROM Loans l
+        JOIN Customers c
+        ON l.CustomerID=c.CustomerID
+        WHERE l.EndDate BETWEEN SYSDATE AND SYSDATE+30;
+
+BEGIN
+
+    FOR loan IN loan_cur LOOP
+
+        DBMS_OUTPUT.PUT_LINE(
+        'Reminder: Loan '
+        || loan.LoanID
+        || ' for '
+        || loan.Name
+        || ' is due on '
+        || TO_CHAR(loan.EndDate,'DD-MON-YYYY'));
+
+    END LOOP;
+
+END;
+/
